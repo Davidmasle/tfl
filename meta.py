@@ -7,7 +7,7 @@ class RewriteSystem:
         self.rules = rules
         self.alphabet = alphabet or []
         self.name = name
-
+        
     def apply_rules_once(self, word):
         results = set()
         for lhs, rhs in self.rules:
@@ -74,20 +74,26 @@ T = [
 alphabet = ["a", "b"]
 system_main = RewriteSystem(T, alphabet, name="T")
 
-def invariant_length_growth_limited(prev, curr):
-    return len(curr) <= len(prev) * 2
+def N(s, w):
+    L = len(s)
+    return sum(1 for i in range(len(w)-L+1) if w[i:i+L] == s)
 
-def invariant_ab_ba_blocks(prev, curr):
-    count_prev = sum(prev[i:i+length] in ['ab','ba'] 
-                     for length in [3,4] for i in range(len(prev)-length+1))
-    count_curr = sum(curr[i:i+length] in ['ab','ba'] 
-                     for length in [3,4] for i in range(len(curr)-length+1))
-    return count_curr <= count_prev + 1
+def J(w):
+    return (N("b", w) + N("ab", w) + N("ba", w) + N("aba", w) + N("abb", w) + N("bba", w) + N("bbb", w)) % 2
 
+def inv_J(start, end):
+    return J(start) == J(end)
 
-experiment = Experiment(system_main, alphabet, word_length=20, steps=8)
+def K(w):
+    return (-2*N("a", w) - N("b", w) + 2*N("aa", w) + N("ab", w) + N("ba", w) 
+            + N("aba", w) + N("abb", w) + N("bba", w) + N("bbb", w))
+
+def inv_K(start, end):
+    return K(start) == K(end)
+
+experiment = Experiment(system_main, alphabet, word_length=12, steps=8)
 summary = experiment.run_metamorphic_tests(
     n_tests=100000,
-    invariants=[invariant_length_growth_limited, invariant_ab_ba_blocks]
-)
+    invariants=[inv_J, inv_K],
+    )
 print(summary)

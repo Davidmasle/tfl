@@ -21,6 +21,9 @@ class RewriteSystem:
     def _bfs(self, start, target_set=None):
         if target_set is None and start in self._closure_cache:
             return self._closure_cache[start]
+
+        if target_set is not None and start in target_set:
+            return True
         seen = {start}
         frontier = [start]
         while frontier:
@@ -28,7 +31,7 @@ class RewriteSystem:
             for w in frontier:
                 for nw in self.apply_rules_once(w):
                     if nw not in seen:
-                        if target_set and nw in target_set:
+                        if target_set is not None and nw in target_set:
                             return True
                         seen.add(nw)
                         new_frontier.append(nw)
@@ -36,13 +39,16 @@ class RewriteSystem:
 
         if target_set is None:
             self._closure_cache[start] = seen
-        return True if target_set else seen
+            return seen
+
+        return False
 
     def closure(self, start):
         return self._bfs(start)
 
     def is_reach(self, start, target_set):
         return self._bfs(start, target_set)
+
 
 class Experiment:
     def __init__(self, system_main, system_check, alphabet, word_length=17, steps=8):
@@ -63,20 +69,22 @@ class Experiment:
                           for i in range(len(word) - len(lhs) + 1)
                           if word[i:i+len(lhs)] == lhs]
             if not matches:
-                continue
+                break
             i, lhs, rhs = self.rng.choice(matches)
             word = word[:i] + rhs + word[i+len(lhs):]
         return word
+
+    def equivalent_via_T1(self, w1, w2):
+        cl1 = self.system_check.closure(w1)
+        cl2 = self.system_check.closure(w2)
+        return bool(cl1 & cl2)
 
     def generate_tests(self, n_tests=5):
         for _ in range(n_tests):
             word = self.rand_word()
             rewritten_word = self.apply_rand_rules(word)
 
-            if len(word) <= len(rewritten_word):
-                equivalent = self.system_check.is_reach(word, self.system_check.closure(word))
-            else:
-                equivalent = self.system_check.is_reach(rewritten_word, self.system_check.closure(rewritten_word))
+            equivalent = self.equivalent_via_T1(word, rewritten_word)
 
             yield (word, rewritten_word, equivalent)
 
@@ -86,8 +94,8 @@ class Experiment:
             print("Исходное слово:", word)
             print("Переписанное слово:", rewritten_word)
             print(f"{self.system_check.name}: {equivalent}\n")
-            counter['total'] += 1
-            counter['success' if equivalent else 'failure'] += 1
+            counter["total"] += 1
+            counter["success" if equivalent else "failure"] += 1
         return counter
 
 T = [
@@ -117,9 +125,6 @@ system_main = RewriteSystem(T, alphabet, name="T")
 system_check = RewriteSystem(T1, alphabet, name="T1")
 
 experiment = Experiment(system_main, system_check, alphabet, word_length=20, steps=8)
-
-for word, rewritten_word, eq in experiment.generate_tests(n_tests=5):
-    pass
 
 summary = experiment.run_tests_summary(n_tests=5)
 print(summary)
